@@ -30,6 +30,7 @@ from twisted.internet import protocol, error, address, task
 from twisted.internet.task import Clock
 from twisted.internet.address import IPv4Address, UNIXAddress, IPv6Address
 
+from twisted.test.iosim import FakeTransport, connect
 
 class AccumulatingProtocol(protocol.Protocol):
     """
@@ -486,6 +487,8 @@ class MemoryReactor(object):
         self.readers = set()
         self.writers = set()
 
+        self.pumps = []
+
 
     def install(self):
         """
@@ -544,7 +547,37 @@ class MemoryReactor(object):
         """
         Not implemented; raises L{NotImplementedError}.
         """
-        raise NotImplementedError()
+        usedc = []
+        for c, tcpclient in enumerate(self.tcpClients):
+            for tcpserver in self.tcpServers:
+                if tcpclient[1] == tcpserver[0]:
+                    usedc.append(c)
+                    sport, sfactory, sbacklog, sinterface = tcpserver
+                    if isIPv6Address(sinterface):
+                        saddr = IPv6Address('TCP', sinterface, sport)
+                    else:
+                        saddr = IPv4Address('TCP', '0.0.0.0', sport)
+                    chost, cport, cfactory, ctimeout, cbindAddress = tcpclient
+                    if isIPv6Address(chost):
+                        caddr = IPv6Address('TCP', chost, cport)
+                    else:
+                        caddr = IPv4Address('TCP', chost, cport)
+                    sproto = sfactory.buildProtocol(caddr)
+                    cproto = cfactory.buildProtocol(saddr)
+                    stransport = FakeTransport(sproto, isServer=True)
+                    ctransport = FakeTransport(cproto, isServer=False)
+                    pump = connect(
+                        sproto, stransport,
+                        cproto, ctransport,
+                        greet=False,
+                        debug=True,
+                    )
+                    self.pumps.append(pump)
+        # yank connected clients off tcpClients
+        for c in usedc[::-1]:
+            self.tcpClients.pop(c)
+        for pump in self.pumps:
+            pump.pump()
 
 
     def fireSystemEvent(self, eventType):
@@ -754,6 +787,7 @@ class MemoryReactor(object):
         """
         self.readers.clear()
         self.writers.clear()
+
 
 
 for iface in implementedBy(MemoryReactor):

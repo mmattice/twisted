@@ -25,7 +25,7 @@ class TestFactory(Factory):
         self.hook = hook
 
     def buildProtocol(self, addr):
-        p = self.protocol(hook)
+        p = self.protocol(self.hook)
         p.factory = self
         return p
 
@@ -47,6 +47,7 @@ class MemoryReactorTests(unittest.TestCase):
         port = 80
         reactor = MemoryReactor()
         srvd, clid = Deferred(), Deferred()
+        srvd._side, clid._side = 'server', 'client'
         srvconn, cliconn = [], []
         srvd.addCallback(srvconn.append)
         clid.addCallback(cliconn.append)
@@ -56,6 +57,10 @@ class MemoryReactorTests(unittest.TestCase):
         reactor.connectTCP('localhost', port, clifactory)
         self.assertEqual(srvconn, [])
         self.assertEqual(cliconn, [])
-        #reactor.pump()
+        reactor.iterate()
         self.assertEqual(len(srvconn), 1)
         self.assertEqual(len(cliconn), 1)
+        cconn = cliconn.pop()
+        sconn = srvconn.pop()
+        sconn.transport.write('test')
+        reactor.iterate()

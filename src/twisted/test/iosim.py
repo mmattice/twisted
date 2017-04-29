@@ -24,8 +24,6 @@ from twisted.python.failure import Failure
 from twisted.internet import error
 from twisted.internet import interfaces
 
-from .proto_helpers import MemoryReactorClock
-
 
 class TLSNegotiation:
     def __init__(self, obj, connectState):
@@ -531,23 +529,3 @@ class ConnectionCompleter(object):
         self._reactor.tcpClients.pop(0)[2].clientConnectionFailed(
             self._reactor.connectors.pop(0), reason
         )
-
-
-
-def connectableEndpoint(debug=False):
-    """
-    Create an endpoint that can be fired on demand.
-
-    @param debug: A flag; whether to dump output from the established
-        connection to stdout.
-    @type debug: L{bool}
-
-    @return: A client endpoint, and an object that will cause one of the
-        L{Deferred}s returned by that client endpoint.
-    @rtype: 2-L{tuple} of (L{IStreamClientEndpoint}, L{ConnectionCompleter})
-    """
-    reactor = MemoryReactorClock()
-    clientEndpoint = TCP4ClientEndpoint(reactor, "0.0.0.0", 4321)
-    serverEndpoint = TCP4ServerEndpoint(reactor, 4321)
-    serverEndpoint.listen(Factory.forProtocol(Protocol))
-    return clientEndpoint, ConnectionCompleter(reactor)
